@@ -49,6 +49,23 @@ function mixin(source, target) {
     return Object.assign(target, source);
 }
 
+function compareValues(v1, v2) {
+    if (v1 == v2) {
+        return 0;
+    } else 
+    if (!isDef(v1)) {
+        return -1;
+    } else 
+    if (!isDef(v2)) {
+        return 1;
+    } else 
+    if (v1 < v2) {
+        return -1
+    } else {
+        return 1;
+    }
+}
+
 class DataSource {
     constructor({data, fieldDefs, filter, sort}) {
         this._private = {data, fieldDefs, filter, sort};
@@ -90,22 +107,7 @@ class DataSource {
             } else
             if (isString(this.sort)) {
                 d = d.sort(function (a, b) {
-                    var v1 = a[self.sort];
-                    var v2 = b[self.sort];
-                    if (v1 == v2) {
-                        return 0;
-                    } else 
-                    if (!isDef(v2)) {
-                        return 1;
-                    } else 
-                    if (!isDef(v1)) {
-                        return -1;
-                    } else 
-                    if (v1 < v2) {
-                        return -1
-                    } else {
-                        return 1;
-                    }
+                    return compareValues(a[self.sort], b[self.sort])
                 }, this)
             } else {
                 //erro, falta implementar
