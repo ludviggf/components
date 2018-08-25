@@ -49,30 +49,27 @@ function mixin(source, target) {
     return Object.assign(target, source);
 }
 
-function compareValues(v1, v2) {
-    if (v1 == v2) {
-        return 0;
-    } else 
-    if (!isDef(v1)) {
-        return -1;
-    } else 
-    if (!isDef(v2)) {
-        return 1;
-    } else 
-    if (v1 < v2) {
-        return -1
-    } else {
-        return 1;
-    }
+function compareValues({v1, v2, inverse = false, emptyFirst = false}) {
+    var r = 0;
+    if (v1 != v2) {
+        if (isDef(v1) && isDef(v2)) {
+            r = v1 < v2 ? -1 : 1; 
+            if (inverse) r = r * (-1);
+        } else {
+            r = emptyFirst ? (isUndef(v1) ? -1 : 1) : (isUndef(v2) ? -1 : 1) ;
+        }
+        return r;
+    } 
+    return r;
 }
 
 class DataSource {
-    constructor({data, fieldDefs, filter, sort}) {
-        this._private = {data, fieldDefs, filter, sort};
+    constructor({data, cols, filter, sort}) {
+        this._private = {data, cols, filter, sort};
         this.refresh();
     }
     refresh() {
-        console.log("refresh");//, this.records.length);
+        console.log("refresh");//, this.rows.length);
         var self = this;
         var d = this.data;
         if (isDef(this.filter)) {
@@ -87,8 +84,8 @@ class DataSource {
             } else
             if (isObject(this.filter)) {
                 d = d.filter(function (item) {
-                    for (var name in this.filter) {
-                        if (this.filter[name] !== item[name]) {
+                    for (var col in this.filter) {
+                        if (this.filter[col] !== item[col]) {
                             return false;
                         }
                       }
@@ -100,20 +97,23 @@ class DataSource {
         }
         if (isDef(this.sort)) {
             /*
-                sort aceita uma funcao do usuario ou uma string com o nome do campo
+                sort aceita uma funcao do usuario ou um objeto {col: "nome", inverse: false, emptyFirst: false}
             */
             if (isFunction(this.sort)) {
                 d = d.sort(this.sort);
             } else
-            if (isString(this.sort)) {
+            if (isObject(this.sort)) {
                 d = d.sort(function (a, b) {
-                    return compareValues(a[self.sort], b[self.sort])
+                    var col = self.sort.col;
+                    var inverse = self.sort.inverse || false;
+                    var emptyFirst = self.sort.emptyFirst || false;
+                    return compareValues({v1: a[col], v2: b[col], inverse: inverse, emptyFirst: emptyFirst});
                 }, this)
             } else {
-                //erro, falta implementar
+                console.log("Error: Sort type not supported");
             }
         }
-        this._private.records = d;
+        this._private.rows = d;
     }
     //propriedades
     get data() {
@@ -123,11 +123,11 @@ class DataSource {
         this._private.data = v;
         this.refresh();
     }
-    get fieldDefs() {
-        return this._private.fieldDefs;
+    get cols() {
+        return this._private.cols;
     }
-    set fieldDefs(v) {
-        this._private.fieldDefs = v;
+    set cols(v) {
+        this._private.cols = v;
         this.refresh();
     }
     get filter() {
@@ -144,8 +144,14 @@ class DataSource {
         this._private.sort = v;
         this.refresh();
     }
-    get records() {
-        return this._private.records;
+    get rows() {
+        return this._private.rows;
+    }
+    get index () {
+        return this._index;
+    }
+    set index (v) {
+        this._index = v;
     }
 
 }
@@ -160,7 +166,7 @@ setTimeout(function () {
 
 
 
-var lista = [{codigo:1, nome:"jose", idade: 21}, {codigo:2, nome:"pedro", idade: 13}, {codigo:3, nome:"joao"}, {codigo:4, nome:"ademar", idade:33}];
+var lista = [{codigo:1, nome:"jose", idade: 21}, {codigo:2, nome:"pedro", idade: 13}, {codigo:3, nome:"joao"}, {codigo:4, nome:"ademar", idade:33}, {codigo:5, nome:"zoio"}, {codigo:6,nome:"zulu",idade:null}];
 console.log(lista);
 
 var m = lista.map(function (item, index, arr) {
@@ -195,12 +201,12 @@ console.log(s2);
 
 var d = new DataSource({
     data: lista,
-    fieldDefs: [
+    cols: [
         "codigo",
         "nome",
         "idade"
     ],
-    sort: "nome",
+    sort: {col: "nome"},
     filter: function(item) { return (item.idade > 15)}
 })
 
