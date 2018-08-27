@@ -26,7 +26,6 @@ function isPrimitive (value) {
     return (
         typeof value === 'string' ||
         typeof value === 'number' ||
-        // $flow-disable-line
         typeof value === 'symbol' ||
         typeof value === 'boolean'
     )
@@ -49,12 +48,12 @@ function mixin(source, target) {
     return Object.assign(target, source);
 }
 
-function compareValues({v1, v2, inverse = false, emptyFirst = false}) {
+function compareValues({v1, v2, reverse = false, emptyFirst = false}) {
     var r = 0;
     if (v1 != v2) {
         if (isDef(v1) && isDef(v2)) {
             r = v1 < v2 ? -1 : 1; 
-            if (inverse) r = r * (-1);
+            if (reverse) r = r * (-1);
         } else {
             r = emptyFirst ? (isUndef(v1) ? -1 : 1) : (isUndef(v2) ? -1 : 1) ;
         }
@@ -63,9 +62,24 @@ function compareValues({v1, v2, inverse = false, emptyFirst = false}) {
     return r;
 }
 
-class DataSource {
-    constructor({data, cols, filter, sort}) {
-        this._private = {data, cols, filter, sort};
+class DataField {
+    constructor ({dataSet, name}) {
+        this._private = {};
+        this._private.dataSet = dataSet;
+        this._private.name = name;
+        this._private.value = 0; 
+    }
+    get value() {
+        return this._private.value; // return this._private.data[this._private.dataSet.index]
+    }
+    set value(v) {
+        this._private.value = v;
+    }
+}
+
+class DataSet {
+    constructor({data, fields, filter, sort}) {
+        this._private = {data, fields, filter, sort};
         this.refresh();
     }
     refresh() {
@@ -84,8 +98,8 @@ class DataSource {
             } else
             if (isObject(this.filter)) {
                 d = d.filter(function (item) {
-                    for (var col in this.filter) {
-                        if (this.filter[col] !== item[col]) {
+                    for (var name in this.filter) {
+                        if (this.filter[name] !== item[name]) {
                             return false;
                         }
                       }
@@ -97,23 +111,50 @@ class DataSource {
         }
         if (isDef(this.sort)) {
             /*
-                sort aceita uma funcao do usuario ou um objeto {col: "nome", inverse: false, emptyFirst: false}
+                sort aceita uma funcao do usuario ou um objeto {name: "nome", reverse: false, emptyFirst: false}
             */
             if (isFunction(this.sort)) {
                 d = d.sort(this.sort);
             } else
             if (isObject(this.sort)) {
                 d = d.sort(function (a, b) {
-                    var col = self.sort.col;
+                    var name = self.sort.name;
                     var inverse = self.sort.inverse || false;
                     var emptyFirst = self.sort.emptyFirst || false;
-                    return compareValues({v1: a[col], v2: b[col], inverse: inverse, emptyFirst: emptyFirst});
+                    return compareValues({v1: a[name], v2: b[name], inverse: inverse, emptyFirst: emptyFirst});
                 }, this)
             } else {
                 console.log("Error: Sort type not supported");
             }
         }
         this._private.rows = d;
+
+        //teste 
+        this.cursor = {};
+        Object.defineProperty(this.cursor, "codigo", {
+            get: function() {
+                return self.getFieldValue("codigo")
+            }, 
+            set: function(v) {
+                self.setFieldValue("codigo", v)
+            },
+            enumerable: true
+        });
+        Object.defineProperty(this.cursor, "nome", {
+            get: function() {
+                return self.getFieldValue("nome")
+            }, 
+            set: function(v) {
+                self.setFieldValue("nome", v)
+            },
+            enumerable: true
+        });
+    }
+    getFieldValue(name) {
+        return this._private.rows[0][name];
+    }
+    setFieldValue(name, value) {
+        this._private.rows[0][name] = value;
     }
     //propriedades
     get data() {
@@ -123,11 +164,11 @@ class DataSource {
         this._private.data = v;
         this.refresh();
     }
-    get cols() {
-        return this._private.cols;
+    get fields() {
+        return this._private.fields;
     }
-    set cols(v) {
-        this._private.cols = v;
+    set fields(v) {
+        this._private.fields = v;
         this.refresh();
     }
     get filter() {
@@ -199,14 +240,14 @@ var s2 = lista.sort(function(a, b) {
 
 console.log(s2);
 
-var d = new DataSource({
+var d = new DataSet({
     data: lista,
-    cols: [
+    fields: [
         "codigo",
         "nome",
         "idade"
     ],
-    sort: {col: "nome"},
+    sort: {name: "nome"},
     filter: function(item) { return (item.idade > 15)}
 })
 
