@@ -62,15 +62,16 @@ function compareValues({ v1, v2, reverse = false, emptyFirst = false }) {
     return r;
 }
 
+class FieldDef {
+
+}
+
 class DataField {
-    constructor({ dataSet, name }) {
-        this._private = {};
-        this._private.dataSet = dataSet;
-        this._private.name = name;
-        this._private.value = 0;
+    constructor(fieldDef) {
+        this._private = {fieldDef};
     }
     get value() {
-        return this._private.value; // return this._private.data[this._private.dataSet.index]
+        return this._private.fieldDef._private.dataSet._private.getFieldValue(this.filedDef); // return this._private.data[this._private.dataSet.index]
     }
     set value(v) {
         this._private.value = v;
@@ -169,37 +170,47 @@ class DataSet {
     //funcoes
     defineFields(fields) {
         var self = this;
-        this._private.fields = {};
-        fields.forEach(function (c, i, a) {
-            if (isString(c)) {
-                self._private.fields[c] = {};
-            } else {
-                self._private.fields[c.name] = c;
-            }
-        }, this);
+        var obj = fields;
+        //converter definicao de fields de array para objeto
+        if (isArray(fields)) {
+            obj = {};
+            fields.forEach(function (c, i, a) {
+                var name;
+                if (isString(c)) {
+                    name = c;
+                    obj[name] = {};
+                } else {
+                    name = c.name;
+                    delete c.name;
+                    obj[name] = c;
+                }
+                obj[name].title = obj[name].title || name;
+            }, this);
+        }
+        this._private.fields = obj;
         //criar o cursor
         this.cursor = {};
-        this.fields.forEach(function (c, i, a) {
-            var f = (this.cursor[c.name] = {});
-            Object.defineProperty(f, "value", {
+        for (var name in this.fields) {
+            var fld = (this.cursor[name] = {});
+            Object.defineProperty(fld, "value", {
                 get: function () {
-                    return self._private.getFieldValue(c.name);
+                    return self._private.getFieldValue(name);
                 },
                 set: function (v) {
-                    self._private.setFieldValue(c.name, v);
+                    self._private.setFieldValue(name, v);
                 },
                 enumerable: true
             });
-            Object.defineProperty(f, "text", {
+            Object.defineProperty(fld, "text", {
                 get: function () {
-                    return self._private.getFieldText(c.name);
+                    return self._private.getFieldText(name);
                 },
                 set: function (v) {
-                    self._private.getFieldText(c.name, v);
+                    self._private.getFieldText(name, v);
                 },
                 enumerable: true
             });
-        }, this);
+        };
     }
     //propriedades
     get data() {
@@ -234,10 +245,7 @@ class DataSet {
         return this._private.rows;
     }
     get index() {
-        return this._index;
-    }
-    set index(v) {
-        this._index = v;
+        return this._private.index;
     }
 
 }
