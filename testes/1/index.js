@@ -1,28 +1,28 @@
-function isObject (obj) {
+function isObject(obj) {
     return obj !== null && typeof obj === 'object'
 }
 
-function isFunction (obj) {
+function isFunction(obj) {
     return obj !== null && typeof obj === 'function'
 }
 
-function isUndef (v) {
+function isUndef(v) {
     return v === undefined || v === null
 }
 
-function isDef (v) {
+function isDef(v) {
     return v !== undefined && v !== null
 }
 
-function isTrue (v) {
+function isTrue(v) {
     return v === true
 }
 
-function isFalse (v) {
+function isFalse(v) {
     return v === false
 }
 
-function isPrimitive (value) {
+function isPrimitive(value) {
     return (
         typeof value === 'string' ||
         typeof value === 'number' ||
@@ -31,43 +31,43 @@ function isPrimitive (value) {
     )
 }
 
-function isString (value) {
+function isString(value) {
     return typeof value === 'string' || value instanceof String;
 }
 
-function isNumber (value) {
+function isNumber(value) {
     return typeof value === 'number' && isFinite(value);
 }
 
-function isArray (value) {
+function isArray(value) {
     return Array.isArray(value);
-}    
-    
-  
+}
+
+
 function mixin(source, target) {
     return Object.assign(target, source);
 }
 
-function compareValues({v1, v2, reverse = false, emptyFirst = false}) {
+function compareValues({ v1, v2, reverse = false, emptyFirst = false }) {
     var r = 0;
     if (v1 != v2) {
         if (isDef(v1) && isDef(v2)) {
-            r = v1 < v2 ? -1 : 1; 
+            r = v1 < v2 ? -1 : 1;
             if (reverse) r = r * (-1);
         } else {
-            r = emptyFirst ? (isUndef(v1) ? -1 : 1) : (isUndef(v2) ? -1 : 1) ;
+            r = emptyFirst ? (isUndef(v1) ? -1 : 1) : (isUndef(v2) ? -1 : 1);
         }
         return r;
-    } 
+    }
     return r;
 }
 
 class DataField {
-    constructor ({dataSet, name}) {
+    constructor({ dataSet, name }) {
         this._private = {};
         this._private.dataSet = dataSet;
         this._private.name = name;
-        this._private.value = 0; 
+        this._private.value = 0;
     }
     get value() {
         return this._private.value; // return this._private.data[this._private.dataSet.index]
@@ -78,13 +78,48 @@ class DataField {
 }
 
 class DataSet {
-    constructor({data, fields, filter, sort}) {
-        this._private = {data, fields, filter, sort};
+    constructor({ data, fields, filter, sort }) {
+        var self = this;
+        this._private = { 
+            data, 
+            filter, 
+            sort,
+            getFieldValue: function (name) {
+                var v = self.rows[self.index][name];
+                if (isDef(self.fields[name].onGetValue)) {
+                    v = self.fields[name].onGetValue(v);
+                }
+                return v;
+            },
+            setFieldValue: function (name, value) {
+                if (isDef(self.fields[name].onSetValue)) {
+                    value = self.fields[name].onSetValue(value);
+                }
+                self.rows[self.index][name] = value;
+            },
+            getFieldText: function (name) {
+                var v = self._private.getFieldValue(name);
+                if (isDef(self.fields[name].onGetText)) {
+                    v = self.fields[name].onGetText(v);
+                }
+                return v;
+            },
+            setFieldText: function (name, value) {
+                if (isDef(self.fields[name].onSetText)) {
+                    value = self.fields[name].onSetText(value);
+                }
+                self._private.setFieldValue(name, value);
+            }
+        };
+        
+
+        this.defineFields(fields);
         this.refresh();
     }
     refresh() {
-        console.log("refresh");//, this.rows.length);
+        console.log("refresh");
         var self = this;
+        this._private.index = -1;
         var d = this.data;
         if (isDef(this.filter)) {
             /*
@@ -96,18 +131,18 @@ class DataSet {
             if (isFunction(this.filter)) {
                 d = d.filter(this.filter, this);
             } else
-            if (isObject(this.filter)) {
-                d = d.filter(function (item) {
-                    for (var name in this.filter) {
-                        if (this.filter[name] !== item[name]) {
-                            return false;
+                if (isObject(this.filter)) {
+                    d = d.filter(function (item) {
+                        for (var name in this.filter) {
+                            if (this.filter[name] !== item[name]) {
+                                return false;
+                            }
                         }
-                      }
-                    return true;
-                }, this)
-            } else {
-                //tipo de filtro nao implementado
-            }
+                        return true;
+                    }, this)
+                } else {
+                    //tipo de filtro nao implementado
+                }
         }
         if (isDef(this.sort)) {
             /*
@@ -116,45 +151,55 @@ class DataSet {
             if (isFunction(this.sort)) {
                 d = d.sort(this.sort);
             } else
-            if (isObject(this.sort)) {
-                d = d.sort(function (a, b) {
-                    var name = self.sort.name;
-                    var inverse = self.sort.inverse || false;
-                    var emptyFirst = self.sort.emptyFirst || false;
-                    return compareValues({v1: a[name], v2: b[name], inverse: inverse, emptyFirst: emptyFirst});
-                }, this)
-            } else {
-                console.log("Error: Sort type not supported");
-            }
+                if (isObject(this.sort)) {
+                    d = d.sort(function (a, b) {
+                        var name = self.sort.name;
+                        var inverse = self.sort.inverse || false;
+                        var emptyFirst = self.sort.emptyFirst || false;
+                        return compareValues({ v1: a[name], v2: b[name], inverse: inverse, emptyFirst: emptyFirst });
+                    }, this)
+                } else {
+                    console.log("Error: Sort type not supported");
+                }
         }
         this._private.rows = d;
-
-        //teste 
+        if (this.rows.length > 0) this._private.index = 0;
+    }
+    
+    //funcoes
+    defineFields(fields) {
+        var self = this;
+        this._private.fields = {};
+        fields.forEach(function (c, i, a) {
+            if (isString(c)) {
+                self._private.fields[c] = {};
+            } else {
+                self._private.fields[c.name] = c;
+            }
+        }, this);
+        //criar o cursor
         this.cursor = {};
-        Object.defineProperty(this.cursor, "codigo", {
-            get: function() {
-                return self.getFieldValue("codigo")
-            }, 
-            set: function(v) {
-                self.setFieldValue("codigo", v)
-            },
-            enumerable: true
-        });
-        Object.defineProperty(this.cursor, "nome", {
-            get: function() {
-                return self.getFieldValue("nome")
-            }, 
-            set: function(v) {
-                self.setFieldValue("nome", v)
-            },
-            enumerable: true
-        });
-    }
-    getFieldValue(name) {
-        return this._private.rows[0][name];
-    }
-    setFieldValue(name, value) {
-        this._private.rows[0][name] = value;
+        this.fields.forEach(function (c, i, a) {
+            var f = (this.cursor[c.name] = {});
+            Object.defineProperty(f, "value", {
+                get: function () {
+                    return self._private.getFieldValue(c.name);
+                },
+                set: function (v) {
+                    self._private.setFieldValue(c.name, v);
+                },
+                enumerable: true
+            });
+            Object.defineProperty(f, "text", {
+                get: function () {
+                    return self._private.getFieldText(c.name);
+                },
+                set: function (v) {
+                    self._private.getFieldText(c.name, v);
+                },
+                enumerable: true
+            });
+        }, this);
     }
     //propriedades
     get data() {
@@ -168,7 +213,7 @@ class DataSet {
         return this._private.fields;
     }
     set fields(v) {
-        this._private.fields = v;
+        this.defineFields(v);
         this.refresh();
     }
     get filter() {
@@ -188,10 +233,10 @@ class DataSet {
     get rows() {
         return this._private.rows;
     }
-    get index () {
+    get index() {
         return this._index;
     }
-    set index (v) {
+    set index(v) {
         this._index = v;
     }
 
@@ -207,7 +252,7 @@ setTimeout(function () {
 
 
 
-var lista = [{codigo:1, nome:"jose", idade: 21}, {codigo:2, nome:"pedro", idade: 13}, {codigo:3, nome:"joao"}, {codigo:4, nome:"ademar", idade:33}, {codigo:5, nome:"zoio"}, {codigo:6,nome:"zulu",idade:null}];
+var lista = [{ codigo: 1, nome: "jose", idade: 21 }, { codigo: 2, nome: "pedro", idade: 13 }, { codigo: 3, nome: "joao" }, { codigo: 4, nome: "ademar", idade: 33 }, { codigo: 5, nome: "zoio" }, { codigo: 6, nome: "zulu", idade: null }];
 console.log(lista);
 
 var m = lista.map(function (item, index, arr) {
@@ -217,7 +262,7 @@ var m = lista.map(function (item, index, arr) {
 console.log(m);
 
 var m2 = lista.map(function (item, index, arr) {
-    if (item.codigo !== 2) return {codigo: item.codigo, nome: item.nome};
+    if (item.codigo !== 2) return { codigo: item.codigo, nome: item.nome };
 })
 
 console.log(m2);
@@ -228,14 +273,14 @@ var f1 = lista.filter(function (item, index, arr) {
 
 console.log(f1);
 
-var s1 = lista.sort(function(a, b) {
-    if (a.nome > b.nome) {return 1} else {return -1} 
+var s1 = lista.sort(function (a, b) {
+    if (a.nome > b.nome) { return 1 } else { return -1 }
 })
 
 console.log(s1);
 
-var s2 = lista.sort(function(a, b) {
-    if (a.nome < b.nome) {return 1} else {return -1} 
+var s2 = lista.sort(function (a, b) {
+    if (a.nome < b.nome) { return 1 } else { return -1 }
 })
 
 console.log(s2);
@@ -245,10 +290,18 @@ var d = new DataSet({
     fields: [
         "codigo",
         "nome",
-        "idade"
+        "idade",
+        {
+            name: "dobro_idade",
+            onReadValue:
+                function (v) {
+                    return v * 2;
+                }
+
+        }
     ],
-    sort: {name: "nome"},
-    filter: function(item) { return (item.idade > 15)}
+    sort: { name: "nome" },
+    filter: function (item) { return (item.idade > 15) }
 })
 
 console.log(JSON.stringify(d));
