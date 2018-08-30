@@ -62,16 +62,48 @@ function compareValues({ v1, v2, reverse = false, emptyFirst = false }) {
     return r;
 }
 
-class FieldDef {
+class FieldModel {
+    constructor ({name, title, onGetValue, onSetValue, onGetText, onSetText}) {
+        this.name = name;
+        this.title = title || name;
+        this.onGetValue = onGetValue;
+        this.onSetValue = onSetValue;
+        this.onGetText = onGetText || 
+            function (v) {
+                return String(v);
+            };
+        this.onSetText = onSetText;
+    }
+}
 
+class StringField extends FieldModel {
+    constructor ({name, title, onGetValue, onSetValue, onGetText, onSetText}) {
+        onSetValue = onSetValue || 
+            function (v) {
+                if (isDef(v)) { v = String(v); } else { v = null; }
+                return v;
+            };
+        super({name, title, onGetValue, onSetValue, onGetText, onSetText});
+    }    
+}
+
+class IntegerField extends FieldModel {
+    constructor ({name, title, onGetValue, onSetValue, onGetText, onSetText}) {
+        onSetValue = onSetValue || 
+            function (v) {
+                v = parseInt(v) || null;
+                return v;
+            };
+        super({name, title, onGetValue, onSetValue, onGetText, onSetText});
+    }     
 }
 
 class DataField {
-    constructor(fieldDef) {
-        this._private = {fieldDef};
+    constructor(fieldModel) {
+        this.fieldModel;
     }
     get value() {
-        return this._private.fieldDef._private.dataSet._private.getFieldValue(this.filedDef); // return this._private.data[this._private.dataSet.index]
+        return this._private.fieldModel._private. fieldDef._private.dataSet._private.getFieldValue(this.filedDef); // return this._private.data[this._private.dataSet.index]
     }
     set value(v) {
         this._private.value = v;
@@ -114,7 +146,7 @@ class DataSet {
         };
         
 
-        this.defineFields(fields);
+        this.expandFields(fields);
         this.refresh();
     }
     refresh() {
@@ -168,7 +200,7 @@ class DataSet {
     }
     
     //funcoes
-    defineFields(fields) {
+    expandFields(fields) {
         var self = this;
         var obj = fields;
         //converter definicao de fields de array para objeto
@@ -223,7 +255,48 @@ class DataSet {
     get fields() {
         return this._private.fields;
     }
-    set fields(v) {
+    set fields(list) {
+        //expandir uma definicao de fields minificada em array para um formato FieldModel completo
+        var self = this;
+        var obj = {};
+        list.forEach(function (c, i, a) {
+            var name;
+            if (isString(c)) {
+                name = c;
+                obj[name] = new FieldModel({name});
+            } else {
+                
+                name = c.name;
+                delete c.name;
+                obj[name] = new FieldModel({});
+            }
+            obj[name].title = obj[name].title || name;
+        }, this);
+        
+        this._private.fields = obj;
+        //criar o cursor
+        this.cursor = {};
+        for (var name in this.fields) {
+            var fld = (this.cursor[name] = {});
+            Object.defineProperty(fld, "value", {
+                get: function () {
+                    return self._private.getFieldValue(name);
+                },
+                set: function (v) {
+                    self._private.setFieldValue(name, v);
+                },
+                enumerable: true
+            });
+            Object.defineProperty(fld, "text", {
+                get: function () {
+                    return self._private.getFieldText(name);
+                },
+                set: function (v) {
+                    self._private.getFieldText(name, v);
+                },
+                enumerable: true
+            });
+        };
         this.defineFields(v);
         this.refresh();
     }
@@ -301,7 +374,7 @@ var d = new DataSet({
         "idade",
         {
             name: "dobro_idade",
-            onReadValue:
+            onGetValue:
                 function (v) {
                     return v * 2;
                 }
