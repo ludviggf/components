@@ -62,188 +62,112 @@ function compareValues({ v1, v2, reverse = false, emptyFirst = false }) {
     return r;
 }
 
-class FieldModel {
-    constructor ({name, title, onGetValue, onSetValue, onGetText, onSetText}) {
-        this.name = name;
-        this.title = title || name;
-        this.onGetValue = onGetValue;
-        this.onSetValue = onSetValue;
-        this.onGetText = onGetText || 
-            function (v) {
-                return String(v);
-            };
-        this.onSetText = onSetText;
-    }
+function parseIntDef(v, d) {
+    v = parseInt(v);
+    if (!isNumber(v)) v = d;
+    return v;
 }
 
-class StringField extends FieldModel {
-    constructor ({name, title, onGetValue, onSetValue, onGetText, onSetText}) {
-        onSetValue = onSetValue || 
-            function (v) {
-                if (isDef(v)) { v = String(v); } else { v = null; }
-                return v;
-            };
-        super({name, title, onGetValue, onSetValue, onGetText, onSetText});
-    }    
+function parseFloatDef(v, d) {
+    v = parseFloat(v);
+    if (!isNumber(v)) v = d;
+    return v;
 }
 
-class IntegerField extends FieldModel {
-    constructor ({name, title, onGetValue, onSetValue, onGetText, onSetText}) {
-        onSetValue = onSetValue || 
-            function (v) {
-                v = parseInt(v) || null;
-                return v;
-            };
-        super({name, title, onGetValue, onSetValue, onGetText, onSetText});
-    }     
+const StringField = {
+    onSetValue: 
+        function (fieldModel, value) {
+            if (isDef(value)) {
+                value = String(value);
+            } else {
+                value = null;
+                if (fieldModel.nulls === false) value = ""; 
+            }
+            if (isFunction(fieldModel.onSetValue)) value = FieldModel.onSetValue(FieldModel, value);
+            return value;
+        }
 }
 
-class DataField {
-    constructor(fieldModel) {
-        this.fieldModel;
-    }
-    get value() {
-        return this._private.fieldModel._private. fieldDef._private.dataSet._private.getFieldValue(this.filedDef); // return this._private.data[this._private.dataSet.index]
-    }
-    set value(v) {
-        this._private.value = v;
-    }
+const IntegerField = {
+    onSetValue: 
+        function (fieldModel, value) {
+            value = parseIntDef(value, fieldModel.nulls === false ? 0 : null);
+            if (isFunction(fieldModel.onSetValue)) value = FieldModel.onSetValue(FieldModel, value);
+            return value;
+        }
 }
+
+const FloatField = {
+    onSetValue: 
+        function (fieldModel, value) {
+            value = parseFloatDef(value, fieldModel.nulls === false ? 0 : null);
+            if (isFunction(fieldModel.onSetValue)) value = FieldModel.onSetValue(FieldModel, value);
+            return value;
+        }
+}
+
 
 class DataSet {
-    constructor({ data, fields, filter, sort }) {
+    constructor({ data, fieldDefs }) {
         var self = this;
-        this._private = { 
+        this._private = {
             data, 
-            filter, 
-            sort,
-            getFieldValue: function (name) {
-                var v = self.rows[self.index][name];
-                if (isDef(self.fields[name].onGetValue)) {
-                    v = self.fields[name].onGetValue(v);
-                }
-                return v;
-            },
-            setFieldValue: function (name, value) {
-                if (isDef(self.fields[name].onSetValue)) {
-                    value = self.fields[name].onSetValue(value);
-                }
-                self.rows[self.index][name] = value;
-            },
-            getFieldText: function (name) {
-                var v = self._private.getFieldValue(name);
-                if (isDef(self.fields[name].onGetText)) {
-                    v = self.fields[name].onGetText(v);
-                }
-                return v;
-            },
-            setFieldText: function (name, value) {
-                if (isDef(self.fields[name].onSetText)) {
-                    value = self.fields[name].onSetText(value);
-                }
-                self._private.setFieldValue(name, value);
-            }
+            fieldDefs
         };
-        
-
-        this.expandFields(fields);
+        this._private.getFieldValue = function (name) {
+        }
+        this._private.setFieldValue = function (name, value) {
+        }
+        this._private.getFieldText = function (name) {
+        }
+        this._private.setFieldText = function (name, text) {
+        }
         this.refresh();
     }
     refresh() {
         console.log("refresh");
         var self = this;
-        this._private.index = -1;
-        var d = this.data;
-        if (isDef(this.filter)) {
-            /*
-                filter aceita uma funcao do usuario ou um objeto
-                exemplos: 
-                    {codigo: "10"}
-                    {codigo: "10", nome: "jose"}
-            */
-            if (isFunction(this.filter)) {
-                d = d.filter(this.filter, this);
-            } else
-                if (isObject(this.filter)) {
-                    d = d.filter(function (item) {
-                        for (var name in this.filter) {
-                            if (this.filter[name] !== item[name]) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }, this)
-                } else {
-                    //tipo de filtro nao implementado
-                }
-        }
-        if (isDef(this.sort)) {
-            /*
-                sort aceita uma funcao do usuario ou um objeto {name: "nome", reverse: false, emptyFirst: false}
-            */
-            if (isFunction(this.sort)) {
-                d = d.sort(this.sort);
-            } else
-                if (isObject(this.sort)) {
-                    d = d.sort(function (a, b) {
-                        var name = self.sort.name;
-                        var inverse = self.sort.inverse || false;
-                        var emptyFirst = self.sort.emptyFirst || false;
-                        return compareValues({ v1: a[name], v2: b[name], inverse: inverse, emptyFirst: emptyFirst });
-                    }, this)
-                } else {
-                    console.log("Error: Sort type not supported");
-                }
-        }
-        this._private.rows = d;
-        if (this.rows.length > 0) this._private.index = 0;
-    }
-    
-    //funcoes
-    expandFields(fields) {
-        var self = this;
-        var obj = fields;
-        //converter definicao de fields de array para objeto
-        if (isArray(fields)) {
-            obj = {};
-            fields.forEach(function (c, i, a) {
+        //converter fieldDefs minificado do formato array para objeto
+        if (isArray(self.fieldDefs)) {
+            var arr = self.FieldDefs;
+            self.fieldDefs = {};
+            arr.forEach(function (c, i, a) {
                 var name;
                 if (isString(c)) {
                     name = c;
-                    obj[name] = {};
+                    self.FieldDefs[name] = {"name": name};
                 } else {
                     name = c.name;
-                    delete c.name;
-                    obj[name] = c;
+                    self.FieldDefs[c.name] = c;
                 }
-                obj[name].title = obj[name].title || name;
-            }, this);
+                self.FieldDefs[name].title = self.FieldDefs[name].title || name;
+            });
         }
-        this._private.fields = obj;
         //criar o cursor
         this.cursor = {};
-        for (var name in this.fields) {
-            var fld = (this.cursor[name] = {});
-            Object.defineProperty(fld, "value", {
+        for (var name in self.fieldDefs) {
+            var field = (this.cursor[name] = {});
+            Object.defineProperty.call(this, field, "value", {
                 get: function () {
-                    return self._private.getFieldValue(name);
+                    return this._private.getFieldValue.call(this, name);
                 },
                 set: function (v) {
-                    self._private.setFieldValue(name, v);
+                    this._private.setFieldValue.call(this, name, v);
                 },
                 enumerable: true
             });
-            Object.defineProperty(fld, "text", {
+            Object.defineProperty.call(this, field, "text", {
                 get: function () {
-                    return self._private.getFieldText(name);
+                    return this._private.getFieldText.call(this, name);
                 },
                 set: function (v) {
-                    self._private.getFieldText(name, v);
+                    this._private.getFieldText.call(this, name, v);
                 },
                 enumerable: true
             });
         };
     }
+       
     //propriedades
     get data() {
         return this._private.data;
@@ -252,75 +176,13 @@ class DataSet {
         this._private.data = v;
         this.refresh();
     }
-    get fields() {
-        return this._private.fields;
+    get fieldDefs() {
+        return this._private.fieldDefs;
     }
-    set fields(list) {
-        //expandir uma definicao de fields minificada em array para um formato FieldModel completo
-        var self = this;
-        var obj = {};
-        list.forEach(function (c, i, a) {
-            var name;
-            if (isString(c)) {
-                name = c;
-                obj[name] = new FieldModel({name});
-            } else {
-                
-                name = c.name;
-                delete c.name;
-                obj[name] = new FieldModel({});
-            }
-            obj[name].title = obj[name].title || name;
-        }, this);
-        
-        this._private.fields = obj;
-        //criar o cursor
-        this.cursor = {};
-        for (var name in this.fields) {
-            var fld = (this.cursor[name] = {});
-            Object.defineProperty(fld, "value", {
-                get: function () {
-                    return self._private.getFieldValue(name);
-                },
-                set: function (v) {
-                    self._private.setFieldValue(name, v);
-                },
-                enumerable: true
-            });
-            Object.defineProperty(fld, "text", {
-                get: function () {
-                    return self._private.getFieldText(name);
-                },
-                set: function (v) {
-                    self._private.getFieldText(name, v);
-                },
-                enumerable: true
-            });
-        };
-        this.defineFields(v);
+    set fieldDefs(v) {
+        this._private.fieldDefs = v;
         this.refresh();
     }
-    get filter() {
-        return this._private.filter;
-    }
-    set filter(v) {
-        this._private.filter = v;
-        this.refresh();
-    }
-    get sort() {
-        return this._private.sort;
-    }
-    set sort(v) {
-        this._private.sort = v;
-        this.refresh();
-    }
-    get rows() {
-        return this._private.rows;
-    }
-    get index() {
-        return this._private.index;
-    }
-
 }
 
 
@@ -374,8 +236,9 @@ var d = new DataSet({
         "idade",
         {
             name: "dobro_idade",
+            type: IntegerField,
             onGetValue:
-                function (v) {
+                function (f, v) {
                     return v * 2;
                 }
 
@@ -386,4 +249,5 @@ var d = new DataSet({
 })
 
 console.log(JSON.stringify(d));
+
 
