@@ -12,27 +12,31 @@ class filha extends mae {
     }
 }
 
-class FieldCodigo extends FieldFormat {
-    getValue(value, fieldName, dataSet) {
+class FormatoCodigo extends FieldFormat {
+    static onGetValue(value, fieldName, dataSet) {
         return value.toString().padStart(6, "0");
     }
+    static get default () { return 0 }
 }
 
 
 var ds = new DataSet({
     fields: [
-        {
-            name: "codigo",
-            format: new FieldCodigo({
-               /* onGetValue: function (v, f, d) {
-                    return parseInt(v) + 100;
-                }*/
-            })
-        }, 
-        {
-            name: "nome"
-        }],
-    data: [{codigo: 1, nome: "Joao"}, {codigo: 2, nome: "Pedro"}]
+        {name: "codigo",  format: FormatoCodigo}, 
+        {name: "nome", default: ""},
+        "idade"
+    ],
+    data: [
+        {codigo: 1, nome: "Joao", idade: 30}, 
+        {codigo: 2, nome: "Pedro", idade: 40}
+    ]
 });
 console.log(ds);
 
+
+/*
+//definir fields com array
+fields: [{name: "codigo",  format: FormatoCodigo}, "nome"]
+//definir fields com objeto
+fields: {codigo: {format: FormatoCodigo}, nome: {}}
+*/
