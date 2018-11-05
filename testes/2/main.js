@@ -16,7 +16,7 @@ class FormatoCodigo extends FieldFormat {
     static onGetValue(value, fieldName, dataSet) {
         return value.toString().padStart(6, "0");
     }
-    static get default () { return 0 }
+    static get default() { return 0 }
 }
 
 

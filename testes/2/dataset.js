@@ -110,8 +110,10 @@ class DataSet {
     set fields(value) {
         let self = this;
         this.state = DataSetState.EMPTY;
-        this._private.fields.forEach(function (field, i, a) {
-            if   typeof field === 'string' || value instanceof String;    
+        value.forEach(function (field, i) {
+            if (typeof field === 'string' || value instanceof String) {
+                value[i] = {name: field};
+            }    
         });
         this._private.fields = value;
         for (var fieldName in this._private.fields) {
@@ -209,8 +211,22 @@ class DataSet {
         return this.state == DataSetState.EDIT;        
     }
     insert() {
-        this.state = DataSetState.INSERT;
-        return this.state == DataSetState.INSERT;
+        if (this.state in [DataSetState.BROWSE, DataSetState.EMPTY]) {
+            this._private.buffer = {};
+            this.fields.forEach(function(field) {
+                var value = undefined;
+                if (field.default) {
+                    value = field.default;
+                } else
+                if ((field.format) || (field.format.default)) {
+                    value = field.format.default;
+                }
+                this._private.buffer[field.name] = value;
+            });
+            this._private.buffer._updateState = DataSetState.INSERT;
+            this._private.state = DataSetState.INSERT;
+            return DataSetState.INSERT;
+        }
     }
     post() {
         this.state = DataSetState.POST;
