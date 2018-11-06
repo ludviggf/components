@@ -1,4 +1,5 @@
 
+
 class mae {
     fala() {
         console.log("mae falando")
@@ -12,17 +13,17 @@ class filha extends mae {
     }
 }
 
-class FormatoCodigo extends FieldFormat {
-    static onGetValue(value, fieldName, dataSet) {
-        return value.toString().padStart(6, "0");
-    }
-    static get default() { return 0 }
+const TipoCodigo = {
+    onGetValue: function (value, fieldName, dataSet) {
+        return (value || 0).toString().padStart(6, "0");
+    },
+    default: 0
 }
 
 
 var ds = new DataSet({
     fields: [
-        {name: "codigo",  format: FormatoCodigo}, 
+        {name: "codigo",  type: TipoCodigo}, 
         {name: "nome", default: ""},
         "idade"
     ],
@@ -33,10 +34,3 @@ var ds = new DataSet({
 });
 console.log(ds);
 
-
-/*
-//definir fields com array
-fields: [{name: "codigo",  format: FormatoCodigo}, "nome"]
-//definir fields com objeto
-fields: {codigo: {format: FormatoCodigo}, nome: {}}
-*/

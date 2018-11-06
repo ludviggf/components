@@ -1,177 +1,110 @@
+"use strict";
 
-class FieldFormat {
-    static onGetValue(value, fieldName, dataSet) {
-        return value;
-    }
-    static onSetValue(value, fieldName, dataSet) {
-        return value;
-    }
-}
+const EMPTY = "empty";
+const BROWSE = "browse";
+const EDIT = "edit";
+const INSERT = "insert";
+const DELETE = "delete";
 
-class DataSetState {
-    static get EMPTY() { return "empty" }
-    static get BROWSE() { return "browse" }
-    static get EDIT() { return "edit" }
-    static get INSERT() { return "insert" }
-    static get POST() { return "post" }
-    static get CANCEL() { return "cancel" }
+const FieldType = {
+    onGetValue: function (value, fieldName, dataSet) {
+        return value;
+    },
+    onSetValue: function (value, fieldName, dataSet) {
+        return value;
+    },
+    default: undefined
 }
 
 class DataSet {
     constructor({data = [], fields = []}) {
-        Object.defineProperty(this, "_private", {value: {}, enumerable: false});
-        this.state = DataSetState.EMPTY;
+        Object.defineProperty(this, "_private", {
+            value: {
+                state: EMPTY,
+                index: -1,
+                cursor: {},
+                data: [],
+                fields: [],
+                deleted: []
+            }, 
+            enumerable: false
+        });
         this.fields = fields;
         this.data = data;
     }
     get state() {
         return this._private.state;
     }
-    set state(value) {
-        if (value !== this.state) {
-            let oldState = this.state;
-            switch (value) {
-                //limpar o dataSet
-                case DataSetState.EMPTY:
-                    this._private.state = DataSetState.EMPTY;
-                    this._private.data = [];
-                    this._private.index = -1;
-                    this._private.cursor = {};
-                break;
-                //iniciar navegacao no dataset
-                case DataSetState.BROWSE:
-                    switch (this.state) {
-                        case DataSetState.INSERT, DataSetState.EDIT:
-                            this.state = DataSetState.POST;
-                        break;
-                        case DataSetState.EMPTY:
-                            if (this.count > 0) {
-                                this._private.state = DataSetState.BROWSE;
-                                this.first();
-                            }
-                        break;
-                    }
-                break;
-                //inserir um registro novo
-                case DataSetState.INSERT:
-                    this.state = DataSetState.BROWSE;
-                    this._private.buffer = {};
-                    for (var fieldName in this.fields) {
-                        this._private.buffer[fieldName] = undefined;
-                    }
-                    this._private.buffer._updateState = DataSetState.INSERT;
-                    this._private.state = DataSetState.INSERT;
-                break;
-                //editar um registro
-                case DataSetState.EDIT:
-                    this.state = DataSetState.BROWSE;
-                    if (this.state == DataSetState.EMPTY) {
-                        this.state = DataSetState.INSERT;
-                    } else {
-                        this._private.buffer = {};
-                        Object.assign(this._private.buffer, this._private.data[this._private.index]);
-                        if (!this._private.buffer._updateState) {
-                            this._private.buffer._updateState = DataSetState.EDIT;
-                            this._private.buffer._oldData = {};
-                            Object.assign(this._private.buffer._oldData, this._private.data[this._private.index]);
-                        }
-                        this._private.state = DataSetState.EDIT;
-                    }
-                break;
-                //gravar um registro em edicao ou insercao
-                case DataSetState.POST:
-                    switch (this.state) {
-                        case DataSetState.INSERT:
-                            this._private.data.push(this._private.buffer);
-                            this._private.state = DataSetState.BROWSE;
-                            this.last();
-                        break;
-                        case DataSetState.EDIT:
-                            this._private.data[this.index] = this._private.buffer;
-                            this._private.state = DataSetState.BROWSE;
-                        break;
-                    }
-                break;
-                //cancelar a inclusao/edicao de um registro
-                case DataSetState.CANCEL:
-                    if ((this.state == DataSetState.INSERT) && (this.state == DataSetState.EDIT)) {
-                        this._private.state = DataSetState.BROWSE;
-                    }
-                break;
-            }
-            if (oldState !== this.state) {
-                //evento
-            }
-        }
-    }    
     get fields() {
         return this._private.fields;
     }
     set fields(value) {
-        let self = this;
-        this.state = DataSetState.EMPTY;
+        this._private.state = EMPTY;
         value.forEach(function (field, i) {
             if (typeof field === 'string' || value instanceof String) {
                 value[i] = {name: field};
-            }    
+            }
+            if (field.type) {
+                Object.assign(field, field.type);
+            }
         });
         this._private.fields = value;
-        for (var fieldName in this._private.fields) {
-            let field = self._private.fields[fieldName];
-            field.name = fieldName;
-            Object.defineProperty(self._private.cursor, fieldName, {
+        this._private.fields.forEach(function (field) {
+            let othis = this;
+            Object.defineProperty(this._private.cursor, field.name, {
                 get: function() { 
-                    let v = self.getRawValue(field.name);
-                    if ((field.format) && (field.format.onGetValue)) {
-                        v = field.format.onGetValue(v, field.name, self);
-                    }
+                    let v = othis.getRawValue(field.name);
                     if (field.onGetValue) {
-                        v = field.onGetValue(v, field.name, self);
+                        v = field.onGetValue(v, field.name, othis);
                     }
                     return v;
                 },
                 set: function(v) {
-                    if ((field.format) && (field.format.onGetValue)) {
-                        v = field.format.onSetValue(v, field.name, self);
-                    }
                     if (field.onSetValue) {
-                        v = field.onSetValue(v, field.name, self);
+                        v = field.onSetValue(v, field.name, othis);
                     }
-                    self.setRawValue(field.name, v);
+                    othis.setRawValue(field.name, v);
                 },
                 enumerable: true
             });
-        }
+        }, this);
+    }
+    get data() {
+        return this._private.data;
     }
     set data(value) {
-        this.state = DataSetState.EMPTY;
+        this._private.state = EMPTY;
+        this._private.index = -1;
         this._private.data = value;
-        if ((!this.fields) && (this.count > 0)) {
-            for (var k in this._private.data[0]) {
-                this._private.fields.push({name: k});
+        if (this.count > 0) {
+            if (this.fields.length == 0) {
+                let flds = {};
+                for (var k in this._private.data[0]) {
+                    flds.push({name: k});
+                }
+                this.fields = flds;
             }
+            this._private.state = BROWSE;
+            this._private.index = 0;
         }
-        this.state = DataSetState.BROWSE;
     }
     get cursor() {
-        if (this.state !== DataSetState.EMPTY) {
+        if (this.state !== EMPTY) {
             return this._private.cursor;
         }
     }
     getRawValue(fieldName) {
         let v;
-        switch (this.state) {
-            case DataSetState.BROWSE:
+        if (this.state == BROWSE) {
                 v = this._private.data[this._private.index][fieldName];
-            break;
-            case DataSetState.INSERT, DataSetState.EDIT:
-                v = this._private.buffer[fieldName];
-            break;
+        } else 
+        if ([INSERT, EDIT].includes(this.state)) {
+            v = this._private.buffer[fieldName];
         }
         return v;
     }
     setRawValue(fieldName, value) {
-        if ((this.state !== DataSetState.EDIT) && (this.state !== DataSetState.INSERT)) {
+        if ((this.state !== EDIT) && (this.state !== INSERT)) {
             this.edit();
         }
         this._private.buffer[fieldName] = value;
@@ -183,11 +116,19 @@ class DataSet {
         return this._private.index;
     }
     set index(value) {
-        if (this.state !== DataSetState.EMPTY) {
+        if (this.state !== EMPTY) {
+            if ([INSERT, EDIT].includes(this.state)) {
+                this.post();
+            }
             if (value < 0) { value = 0; }
             if (value > (this.count - 1)) { value = this.count - 1; }
-            this.state = DataSetState.BROWSE;
-            this._private.index = value;
+            if (value !== this.index) {
+                this._private.state = BROWSE;
+                this._private.index = value;
+                if (value == -1) {
+                    this._private.state = EMPTY;
+                }
+            }    
         }
     }
     next() {
@@ -207,33 +148,68 @@ class DataSet {
         return this.index;
     }
     edit() {
-        this.state = DataSetState.EDIT;
-        return this.state == DataSetState.EDIT;        
+        if (this.state == EMPTY) {
+            this.insert();
+        } else
+        if (this.state == BROWSE) {
+            this._private.buffer = {};
+            Object.assign(this._private.buffer, this._private.data[this._private.index]);
+            if (!this._private.buffer._updateState) {
+                this._private.buffer._updateState = EDIT;
+                this._private.buffer._oldData = {};
+                Object.assign(this._private.buffer._oldData, this._private.data[this._private.index]);
+            }
+            this._private.state = EDIT;    
+        }
     }
     insert() {
-        if (this.state in [DataSetState.BROWSE, DataSetState.EMPTY]) {
+        if ([BROWSE, EMPTY].includes(this.state)) {
             this._private.buffer = {};
             this.fields.forEach(function(field) {
                 var value = undefined;
-                if (field.default) {
+                if (field.default !== undefined) {
                     value = field.default;
-                } else
-                if ((field.format) || (field.format.default)) {
-                    value = field.format.default;
                 }
                 this._private.buffer[field.name] = value;
-            });
-            this._private.buffer._updateState = DataSetState.INSERT;
-            this._private.state = DataSetState.INSERT;
-            return DataSetState.INSERT;
+            }, this);
+            this._private.buffer._updateState = INSERT;
+            this._private.state = INSERT;
+        }
+    }
+    delete() {
+        if (this.state == BROWSE) {
+            var buffer = this._private.data[this._private.index];
+            if (buffer._updateState !== INSERT) {
+                if (buffer._updateState == EDIT) {
+                    buffer = buffer._oldData;
+                }
+                buffer._updateState = DELETE;
+                this._private.deleted.push(buffer);
+            }
+            this._private.data.splice(this._private.index, 1);
+            this.index = this.index;
         }
     }
     post() {
-        this.state = DataSetState.POST;
-        return this.state == DataSetState.BROWSE;
+        if (this.state == INSERT) {
+            this._private.data.push(this._private.buffer);
+            this._private.state = BROWSE;
+            this.last();
+        } else
+        if (this.state == EDIT) {
+            this._private.data[this.index] = this._private.buffer;
+            this._private.state = BROWSE;
+        }
     }
     cancel() {
-        this.state = DataSetState.BROWSE;
-        return this.state == DataSetState.BROWSE;
+        if ([INSERT, EDIT].includes(this.state)) {
+            this._private.state = BROWSE;
+        }
+    }
+    get delta() {
+        var a = this._private.data.filter(function (item) {
+            return item._updateState;
+        }, this);
+        return a.concat(this._private.deleted);
     }
 }
