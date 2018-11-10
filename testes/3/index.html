@@ -1,0 +1,145 @@
+<html>
+    <head>
+        <script src="dataset.js"></script>
+        <script src="assets/bootstrap/bootstrap.js"></script>
+        <link rel="stylesheet" href="assets/bootstrap/bootstrap.css">
+    </head>
+    <body>
+        <script>
+            class Renderable {
+                constructor (props = {}) {
+                    this._parent = undefined;
+                    this._element = document.createElement(this.tagName || props.tagName);
+                    delete props.tagName;
+                    this._element.__owner__ = this;
+                    this.setAttributes(props);
+                    this.setEvents(props);
+                    this.setElements(props);
+                }
+                get tagName() { return undefined }
+                get parent() { return this._parent }
+                set parent(value) { this._parent = value }
+                get element() { return this._element }
+                setAttributes (value) {
+                    for (let k in value) {
+                        let t = typeof value[k];
+                        if ((k !== "elements") && (!["function", "object"].includes(t))) {
+                            if (t == "boolean") {
+                                if (value[k]) {
+                                    this.element[k] = value[k];
+                                } else {
+                                    this.element.removeAttribute(k);    
+                                }
+                            } else {
+                                if (value[k] !== undefined) {
+                                    this.element.setAttribute(k, value[k]);
+                                } else {
+                                    this.element.removeAttribute(k);
+                                }
+                            }
+                        }                        
+                    }
+                }
+                setEvents(value) {
+                    for (let k in value) {
+                        let t = typeof value[k];
+                        if ((t == "function") && (k.substr(0,2) == "on")) {
+                            this.element.addEventListener(k.substr(2), value[k]);
+                        }                        
+                    }
+                }
+                setElements(value) {
+                    let elms = value["elements"];
+                    if (elms) {
+                        elms.forEach(e => {
+                            if (e instanceof Renderable) {
+                                this.element.appendChild(e.element);
+                            } else {
+                                this.element.appendChild(document.createTextNode(e));
+                            }
+                        });
+                    }
+                }
+            }
+
+            class Tag extends Renderable {                
+                constructor (aTagName, props) {
+                    props = props || {};
+                    props.tagName = aTagName;
+                    super(props);
+                }
+            }
+
+            class Div extends Renderable {
+                get tagName() { return 'div' }
+            }
+
+            class App extends Div {
+                mostraSeuID() {
+                    return this.element.id;
+                }
+            }
+
+            class Input extends Renderable {
+                get tagName() { return "input" }
+            }
+
+            class InputText extends Input {
+                constructor (props) {
+                    props = props !== undefined ? props : {};
+                    props.type = "text";
+                    super(props);
+                }
+            }
+
+            class TextField extends InputText {
+                constructor (fieldName, props) {
+                    props = props !== undefined ? props : {};
+                    props["data-field"] = fieldName;
+                    props.oninput = function () {
+                        let ds = this.__dataSet__;
+                        if ((ds) && (this.dataField)) {
+                            ds.fields[this.dataField] = this.value; 
+                        }
+                    }
+                    super(props);   
+                }
+            }
+            
+            //*********************************
+            // TESTE
+            //*********************************
+
+            var app = new App({
+                id: "App",
+                elements: [
+                    "Texto puro",
+                    new Div({elements: [
+                        "Outro texto"    
+                    ]}),
+                    new Tag('h2', {elements: [
+                        new Tag('h1', {elements: ['texto h1']})
+                    ]}),
+                    new Tag('label', {elements: [
+                        "um:",
+                        new TextField("um")
+                    ]}),                    
+                    new Tag('label', {elements: [
+                        "dois:",
+                        new TextField("dois")
+                    ]}),
+                    new TextField("codigo"),
+                    new TextField("nome")
+                ],
+                onclick: function () { 
+                    //let a = this.__owner__;
+                    //alert(a.mostraSeuID()); 
+                },
+                //onclick: 'alert("clicou")',
+                ignore: {}
+            });
+            document.body.appendChild(app.element);
+
+        </script>
+    </body>
+</html>
