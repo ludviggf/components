@@ -1,10 +1,10 @@
-class Component {
+class Tag {
     constructor (tag, ...args) {
         this.tag = tag;
         this.element = document.createElement(this.tag);
         this.element.__component__ = this;
         args.forEach(e => {
-            if (e instanceof Component) {
+            if (e instanceof Tag) {
                 this.add(e);
             } else
             if (typeof e == "object") {
@@ -34,7 +34,7 @@ class Component {
         return this;
     }
     add(...args) {
-        args.forEach(e => {
+        args.forEach(function(e) {
             this.element.appendChild(e.element);
         });
         return this;
@@ -45,12 +45,6 @@ class Component {
     }
     text(txt) {
         this.element.textContent = txt;
-    }
-    show() {
-        this.element.style.removeProperty("display");
-    }
-    hide() {
-        this.element.style.setProperty("display", "none");
     }
 }
 
@@ -68,7 +62,8 @@ class Img extends Component {
 
 class Button extends Component {
     constructor(caption, ...args) {
-        super("button", caption, ...args);
+        super("button", ...args);
+        this.element.textContent = caption;
     }
 }
 

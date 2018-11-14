@@ -1,14 +1,30 @@
 <html>
     <head>
+        <meta charset="utf-8">
         <script src="dataset.js"></script>
        <!-- <script src="assets/bootstrap/bootstrap.js"></script> !-->
         <link rel="stylesheet" href="assets/bootstrap/bootstrap.css">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <script src="components.js"></script>
+        <script type="text/html" src="teste3.html"></script>
     </head>
     <body>
         <script>
-           
+           let app = new Div(
+                {id: "app"},
+                new Div({id: "rec1", style: "width:200px;height:100px;background:blue;display:none"}),
+                new Div({id: "rec2", style: "width:200px;height:100px;background:yellow;display:none"}),
+                new Div({id: "rec3", style: "width:200px;height:100px;background:red;display:none"}),
+                new Div(
+                    new Button("1").on("click", function() {
+                        //alert(this.parentNode.parentNode.querySelector("#rec1"));
+                        let a = this.parentNode.parentNode.querySelector("#rec1");
+                        a.style.removeProperty("display");
+                    })
+
+                )
+           );
+           document.body.appendChild(app.element);
         </script>
     </body>
 </html>
